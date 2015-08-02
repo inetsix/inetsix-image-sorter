@@ -8,10 +8,10 @@ Script parses source directory recursively and catches all file with "JPG" or "j
 
 Script handle some generic errors:
 - Catch UTF-8 and non UTF-8 encoding: Usage of special characters in directory or filename is managed by script
-- EXIF encoding method: some vendors encode DateTimeOriginal field under its numerical identifier
+- EXIF encoding method: some vendors encode 'DateTimeOriginal' field under its numerical identifier (36867)
 - PIL cannot open some files due to their encoding. Exif Read is used as a backup Exif's reader
 
-In any case, if no DateTimeOriginal might be identified, then, image is moved to a generic directory named UNSORTED and created under destination directory.
+In any case, if no 'DateTimeOriginal' might be identified, then, image is moved to a generic directory named UNSORTED and created under destination directory.
 
 ## Setup Guide.
 
@@ -40,9 +40,10 @@ Most of them are built in Python. Others are available here:
 * help :
 ```shell
 	python inetsix-images-sorter.py -h
-		usage: inetsix-images-sorter.py [-h] [-s SOURCE] [-d DESTINATION] [-m MODE]
+		usage: inetsix-images-sorter-v0.4.py [-h] [-s SOURCE] [-d DESTINATION]
+                                     [-m MODE] [-l LOGFILE] [-v VERBOSE]
 
-		Inetsix Image Sorter -- version 0.1
+		Inetsix Image Sorter -- version 0.4
 
 		optional arguments:
 		  -h, --help            show this help message and exit
@@ -52,6 +53,10 @@ Most of them are built in Python. Others are available here:
 		                        Destination Directory where photos are going to be
 		                        sorted
 		  -m MODE, --mode MODE  Mode for output: single(YYYY-MM-DD) / tree(YYYY/MM/DD)
+		  -l LOGFILE, --logfile LOGFILE
+		                        File uses to store log, default is activity.log
+		  -v VERBOSE, --verbose VERBOSE
+		                        Log Verbosity, default is set to info
 ```
 
 * Use case with TREE structure:
@@ -90,6 +95,10 @@ Most of them are built in Python. Others are available here:
 ```
 
 ## Changelog
+- v0.4:
+	- Add VERBOSE switch
+	- Add capability to define log file
+	- Add comments to all functions.
 - v0.3:
 	- Workaround to cover issue when PIL is not able to open file: switch to exifread librairy
 	- Add support for REGEXP to match EXIF Field: DateTimeOriginal|DateTimeDigitized|36867

@@ -8,7 +8,7 @@ Author:
 Date:
     August 2 2015
 Version:
-    0.3
+    0.4
 Changelog:
 	v0.3:
 		- Workaround to cover issue when PIL is not able to open file: switch to exifread librairy
@@ -21,7 +21,6 @@ Changelog:
 		- Add some Exception handler to secure script execution
 		- Does not move image if target already exist (No overrride)
 '''
-
 import os
 import io
 import pprint
@@ -40,30 +39,22 @@ from optparse import OptionParser
 from logging.handlers import RotatingFileHandler
 
 # ----------------------------------------------------------------- #
-# GENERIC PARAMs Section											#
+# GENERIC PARAMs Section
 # ----------------------------------------------------------------- #
 
 ### Default values
 src_dir = "./src-img/"
 dst_dir = "./sorted/"
+version='0.4'
 
 ### Init Logger and Formatter
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(funcName)s :: %(message)s')
-### Display log with DEBUG level and higher
-steam_handler = logging.StreamHandler()
-steam_handler.setLevel(logging.DEBUG)
-steam_handler.setFormatter(formatter)
-logger.addHandler(steam_handler)
-### Write log with INFO level and higher
-file_handler = logging.FileHandler('activity.log')
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+
 
 # ----------------------------------------------------------------- #
-# LOG LEVEL															#
+# LOG LEVEL	
 # ----------------------------------------------------------------- #
 # DEBUG: information uses to understand script's actions
 # INFO: generic information to log
@@ -73,7 +64,7 @@ logger.addHandler(file_handler)
 
 
 # ----------------------------------------------------------------- #
-# Function Section 													#
+# Function Section
 # ----------------------------------------------------------------- #
 
 ### Get Exif Field value
@@ -96,6 +87,7 @@ def get_field (exif , field,image) :
 	logger.warning('No EXIF found in %s',image)
 	return False
 
+### DEBUG PURPOSE
 ### List all Exif Fields and values
 ### exif: array of values
 def list_exif(exif):
@@ -108,17 +100,27 @@ def list_exif(exif):
 
 ### Create Directory:
 ### dirIn is name of new directory.
-### It will be created under dst_dir
+### It will be created under options.destination directory
+### dirIn: New directory structure to create
+### base: Base directory where to create new structure: should be equal to options.destination
 def create_single_dir( dirIn, base):
 	if os.path.isdir(os.path.join(base, dirIn) ) is not True:
 		os.makedirs(os.path.join(base, dirIn) )
 
+### Create Directory:
+### dirIn is name of new directory.
+### It will be created under options.destination directory
+### date: New directory structure to create
+### base: Base directory where to create new structure: should be equal to options.destination
 def create_tree(date, base):
+	# Split each element drom date.
 	directories = date.split("-")
 	logger.debug('Destination directory is based on %s', date)
+	# Trigger uses to log information
 	do_it = False
 	for directory in directories:
 		#logger.debug('Directory is %s', directory)
+		# If destination directory is not present, we create it
 		if os.path.isdir( os.path.join(base, directory) ) is not True:
 			logger.debug('Directory %s does not exist, create it !', directory)
 			os.makedirs( os.path.join(base, directory) )
@@ -127,7 +129,11 @@ def create_tree(date, base):
 	if do_it is True:
 		logger.info('Create directory %s', base)
 
-### Def to move image to directory based on simgle structure
+### Def to move image to directory. 
+### Operation is a COPY for the moment since MOVE will loose all original structure and might be a problem if our script fails
+### image: filename of our image
+### src_dir: source directory containing our image
+### dst_dir: destination directory where to copy image
 def move_image( image, src_dir, dst_dir ):
 	try:
 		target_image = os.path.join( dst_dir.encode('utf-8'), image.encode('utf-8'))
@@ -145,7 +151,9 @@ def move_image( image, src_dir, dst_dir ):
 		logger.warning('Can\'t copy %s from %s to the destination dir %s', image.encode('utf-8') , src_dir.encode('utf-8'), dst_dir.encode('utf-8'))
 		logger.error('IOError:%s' , format(e))
 
-### Def to create structure at the first step.
+### Def to create structure at the first step of this script
+### All operation required to run script safely.
+### All this operation need to be manually defined here
 def init_script():
 	if os.path.isdir(options.destination) is not True:
 		logger.debug('Create Directory: %s',options.destination)
@@ -155,14 +163,19 @@ def init_script():
 		os.makedirs(options.destination+"UNSORTED/")
 
 ### Delete hours, minutes and second from Exif value
-### Replace all : to - to be able to create directories per date
+### Replace all ":" to "-" to be able to create directories per date
+### dateIn: Date provided by EXIF field.
 def normalize_date(dateIn):
 	logger.debug('Date to normalize: \"%s\"', str(dateIn) )
 	dateIn = re.sub(r"(\s+\d{2}:\d{2}:\d{2})", "/", str(dateIn) )
 	dateOut = re.sub(r":", "-", dateIn)
 	return dateOut
 
+### Main function of this script
+### Provides core of it by running test and propagate data along all operations
+### OPTIONS: array of arg creating during init stage
 def main( options ):
+	logger.info("Script started")
 	init_script()
 	logger.info('Start to sort images')
 	for root, dirnames, filenames in os.walk(options.source.encode('utf8')):
@@ -176,11 +189,12 @@ def main( options ):
 				logger.critical('%s cannot be opened using PIL from directory %s', unicode(image.decode('utf-8')), unicode(root.decode('utf-8')) )
 				logger.error('IOError:%s' , format(e))
 				logger.info('Try to use EXIFREAD to extract data')
+				# If PIL is not able to open file, then fall back to EXIF READ library
 				f = open( os.path.join( unicode(root.decode('utf-8')) , unicode(image.decode('utf-8')) ), 'rb' )
 				exif_data = exifread.process_file(f)
 			# Extract EXIF field for date based on DateTimeOriginal field
 			# Hack to identify EXIF Code used by pentax to store DateTimeOriginal field
-#			# http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif/datetimeoriginal.html
+			# http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif/datetimeoriginal.html
 			exif_field = get_field( exif_data , '(DateTimeOriginal|DateTimeDigitized|36867)', os.path.join( root.decode('utf-8'), image.decode('utf-8') ) )
 			logger.debug('EXIF_FIELD is set to: %s', exif_field)
 			# If Image has no EXIF information, we go to next image
@@ -210,22 +224,53 @@ def main( options ):
 				create_single_dir(date)
 
 # ----------------------------------------------------------------- #
-# MAIN Section 														#
+# MAIN Section
 # ----------------------------------------------------------------- #
 
 if __name__ == "__main__":
 	"""
 	Script Launcher
 	"""
-	logger.info("Script started")
 	# Manage cmdLine parameters.
-	parser = argparse.ArgumentParser(description="Inetsix Image Sorter -- version 0.1")
+	parser = argparse.ArgumentParser(description="Inetsix Image Sorter -- version "+version)
 	parser.add_argument('-s','--source' ,help='Source Directory where photos are located',default=src_dir)
 	parser.add_argument('-d','--destination' ,help='Destination Directory where photos are going to be sorted',default=dst_dir)
 	parser.add_argument('-m','--mode' ,help='Mode for output: single(YYYY-MM-DD) / tree(YYYY/MM/DD)',default="single")
+	parser.add_argument('-l','--logfile' ,help='File uses to store log, default is activity.log',default='activity.log')
+	parser.add_argument('-v','--verbose' ,help='Log Verbosity, default is set to info',default='info')
 
 	# Manage All options and construct array
 	options = parser.parse_args()
+
+	# Configure Logging options:
+	### Display log with DEBUG level and higher
+	steam_handler = logging.StreamHandler()
+	steam_handler.setLevel(logging.DEBUG)
+	steam_handler.setFormatter(formatter)
+	logger.addHandler(steam_handler)
+	### Write log with INFO level and higher
+	file_handler = logging.FileHandler(options.logfile)
+	file_handler.setLevel(logging.DEBUG)
+	file_handler.setFormatter(formatter)
+
+	### Set verbosity level:
+	if options.verbose == 'debug':
+		file_handler.setLevel(logging.DEBUG)
+		steam_handler.setLevel(logging.DEBUG)
+	elif options.verbose == 'info':
+		file_handler.setLevel(logging.INFO)
+		steam_handler.setLevel(logging.INFO)
+	elif options.verbose == 'warning':
+		file_handler.setLevel(logging.WARNING)
+		steam_handler.setLevel(logging.WARNING)
+	else:
+		file_handler.setLevel(logging.INFO)
+		steam_handler.setLevel(logging.INFO)
+
+	### Add handler to logger
+	logger.addHandler(steam_handler)
+	logger.addHandler(file_handler)
+
 	logger.info('Start to sort images using %s mode', options.mode)
 	logger.info('Source directory: %s',options.source)
 	logger.info('Destination directory: %s',options.destination)
